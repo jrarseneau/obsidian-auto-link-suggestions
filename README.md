@@ -8,6 +8,7 @@ An Obsidian plugin that automatically suggests note titles as you type and creat
 - **Usage-Based Ranking**: Notes you link to frequently appear first in suggestions (learns from your behavior)
 - **Recency Weighting**: Boost recently-used notes to prioritize current work over old favorites
 - **Time-Based Decay**: Gradually reduce rankings for notes not used recently to keep suggestions fresh
+- **Newness Boost**: Temporarily boost recently-created notes to surface fresh content
 - **Alias Support**: Includes note aliases from frontmatter in suggestions
 - **Flexible Matching**: Choose between matching anywhere in the title or only at the start
 - **Customizable Behavior**: Configure minimum trigger length, maximum suggestions, and more
@@ -40,6 +41,9 @@ Access the plugin settings via Settings → Auto Link Suggestions to customize t
 | **Enable Recency Boost** | Boost recently-used notes in rankings | On | Prioritizes notes you've linked to recently. A note used yesterday will rank higher than one used months ago, even with the same total usage count |
 | **Recency Weight** | Balance between recency and frequency (0-100%) | 30% | Higher values favor recently-used notes more. At 30%, scoring is 70% frequency + 30% recency. At 50%, they're equally weighted |
 | **Decay Period (days)** | Days before rankings start to decay | 90 | Notes not used within this period gradually lose ranking (50% reduction over the next period). Prevents old favorites from dominating forever |
+| **Enable Newness Boost** | Boost recently-created notes in rankings | On | Gives newly-created notes a temporary ranking boost that fades over time. Perfect for surfacing recent meeting notes, project docs, etc. |
+| **Newness Boost Duration (days)** | How long newness boost applies | 30 | Notes created within this period get a boost. A note created today gets maximum boost, fading to zero at this threshold |
+| **Newness Boost Strength** | Maximum boost multiplier (0.0-2.0) | 0.5 | At 0.5, brand-new notes get up to 1.5x ranking boost. At 1.0, up to 2.0x. Higher values make new notes more prominent |
 
 ## Installation
 
@@ -99,6 +103,28 @@ The plugin can also prioritize recently-used notes and decay old rankings:
 - At 30% recency weight (default): 70% frequency + 30% recency
 - At 50% recency weight: Equal balance
 - At 0% recency weight: Pure frequency-based ranking (like before)
+
+### Newness Boost
+The plugin can boost recently-created notes to help surface fresh content:
+
+**Your scenario**: You have notes with "Sandra" in the title
+- "Sandra Smith" - Created 2 years ago, linked 50 times
+- "Sandra - Coaching Session 2024-11-07" - Created 7 days ago, linked 1 time
+
+**Without newness boost** (typing "Sandra"):
+- Sandra Smith (scores very high due to frequency)
+- Sandra - Coaching Session 2024-11-07 (may not appear in top suggestions)
+
+**With newness boost enabled** (typing "Sandra"):
+- Sandra Smith ⭐ (still high due to frequency)
+- Sandra - Coaching Session 2024-11-07 🆕 (boosted up to 1.5x, now visible!)
+
+**How it works**:
+- Notes created today: Full boost (e.g., 1.5x with default 0.5 strength)
+- Notes created 15 days ago: Half boost (1.25x)
+- Notes created 30+ days ago: No boost (1.0x, normal ranking)
+
+This ensures your recent meeting notes, new project documentation, and fresh content appear in suggestions even if they haven't been linked frequently yet. The boost fades over time so established patterns eventually take over.
 
 ### With Aliases
 If you have a note "Artificial Intelligence.md" with frontmatter:
