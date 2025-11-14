@@ -31,6 +31,9 @@ interface AutoLinkSettings {
 	includeAliases: boolean;
 	showPath: boolean;
 	enableUsageRanking: boolean;  // Toggle usage-based ranking
+	enableRecencyBoost: boolean;  // Boost recently-used notes
+	recencyWeight: number;        // Weight for recency (0-100, percentage)
+	decayDays: number;            // Days before usage starts to decay
 }
 
 const DEFAULT_SETTINGS: AutoLinkSettings = {
@@ -41,6 +44,9 @@ const DEFAULT_SETTINGS: AutoLinkSettings = {
 	includeAliases: true,
 	showPath: false,
 	enableUsageRanking: true,
+	enableRecencyBoost: true,
+	recencyWeight: 30,      // 30% weight to recency, 70% to frequency
+	decayDays: 90,          // Start decaying after 90 days
 }
 
 class NoteTitleSuggester extends EditorSuggest<NoteTitleSuggestion> {
@@ -199,15 +205,88 @@ class NoteTitleSuggester extends EditorSuggest<NoteTitleSuggestion> {
 		// Sort by usage frequency if enabled
 		if (settings.enableUsageRanking) {
 			const usageStats = this.plugin.usageStats;
+			const now = Date.now();
+			const dayInMs = 24 * 60 * 60 * 1000;
+			const decayThreshold = settings.decayDays * dayInMs;
+
+			// Find max values for normalization
+			let maxCount = 0;
+			let maxRecency = 0;
+
+			for (const suggestion of suggestions) {
+				const stats = usageStats[suggestion.file.path];
+				if (stats) {
+					maxCount = Math.max(maxCount, stats.count);
+					if (stats.lastUsed > 0) {
+						const timeSinceUse = now - stats.lastUsed;
+						maxRecency = Math.max(maxRecency, 1 / (timeSinceUse + 1));
+					}
+				}
+			}
+
 			suggestions.sort((a, b) => {
-				const aCount = usageStats[a.file.path]?.count || 0;
-				const bCount = usageStats[b.file.path]?.count || 0;
-				return bCount - aCount; // Descending order (most used first)
+				const aStats = usageStats[a.file.path];
+				const bStats = usageStats[b.file.path];
+
+				const aScore = this.calculateScore(aStats, now, maxCount, maxRecency, dayInMs, decayThreshold, settings);
+				const bScore = this.calculateScore(bStats, now, maxCount, maxRecency, dayInMs, decayThreshold, settings);
+
+				return bScore - aScore; // Descending order (highest score first)
 			});
 		}
 
 		// Limit to maximum suggestions
 		return suggestions.slice(0, settings.maxSuggestions);
+	}
+
+	/**
+	 * Calculate a weighted score for a suggestion based on usage statistics
+	 */
+	private calculateScore(
+		stats: { count: number; lastUsed: number } | undefined,
+		now: number,
+		maxCount: number,
+		maxRecency: number,
+		dayInMs: number,
+		decayThreshold: number,
+		settings: AutoLinkSettings
+	): number {
+		if (!stats || stats.count === 0) {
+			return 0;
+		}
+
+		// Normalize frequency score (0-1)
+		const frequencyScore = maxCount > 0 ? stats.count / maxCount : 0;
+
+		// Calculate recency score (0-1)
+		let recencyScore = 0;
+		if (settings.enableRecencyBoost && stats.lastUsed > 0) {
+			const timeSinceUse = now - stats.lastUsed;
+			const recencyValue = 1 / (timeSinceUse + 1);
+			recencyScore = maxRecency > 0 ? recencyValue / maxRecency : 0;
+		}
+
+		// Apply time-based decay
+		let decayFactor = 1.0;
+		if (stats.lastUsed > 0) {
+			const timeSinceUse = now - stats.lastUsed;
+			if (timeSinceUse > decayThreshold) {
+				// Linear decay: reduce by 50% over the next decay period
+				const decayPeriod = timeSinceUse - decayThreshold;
+				const decayRatio = Math.min(decayPeriod / decayThreshold, 1.0);
+				decayFactor = 1.0 - (decayRatio * 0.5);
+			}
+		}
+
+		// Combine scores with weights
+		const recencyWeightFraction = settings.recencyWeight / 100;
+		const frequencyWeightFraction = 1 - recencyWeightFraction;
+
+		const baseScore = settings.enableRecencyBoost
+			? (frequencyScore * frequencyWeightFraction) + (recencyScore * recencyWeightFraction)
+			: frequencyScore;
+
+		return baseScore * decayFactor;
 	}
 
 	/**
@@ -352,6 +431,47 @@ class AutoLinkSettingsTab extends PluginSettingTab {
 				.onChange(async (value) => {
 					this.plugin.settings.enableUsageRanking = value;
 					await this.plugin.saveSettings();
+				}));
+
+		// Enable recency boost
+		new Setting(containerEl)
+			.setName('Enable recency boost')
+			.setDesc('Boost recently-used notes in rankings. Notes used recently will rank higher than those used long ago.')
+			.addToggle(toggle => toggle
+				.setValue(this.plugin.settings.enableRecencyBoost)
+				.onChange(async (value) => {
+					this.plugin.settings.enableRecencyBoost = value;
+					await this.plugin.saveSettings();
+				}));
+
+		// Recency weight
+		new Setting(containerEl)
+			.setName('Recency weight')
+			.setDesc('How much to weight recency vs frequency (0-100%). Higher values favor recently-used notes. Default: 30%')
+			.addText(text => text
+				.setPlaceholder('30')
+				.setValue(String(this.plugin.settings.recencyWeight))
+				.onChange(async (value) => {
+					const num = parseInt(value);
+					if (!isNaN(num) && num >= 0 && num <= 100) {
+						this.plugin.settings.recencyWeight = num;
+						await this.plugin.saveSettings();
+					}
+				}));
+
+		// Decay days
+		new Setting(containerEl)
+			.setName('Decay period (days)')
+			.setDesc('Number of days before note rankings start to decay. Notes unused beyond this period gradually lose ranking. Default: 90 days')
+			.addText(text => text
+				.setPlaceholder('90')
+				.setValue(String(this.plugin.settings.decayDays))
+				.onChange(async (value) => {
+					const num = parseInt(value);
+					if (!isNaN(num) && num > 0) {
+						this.plugin.settings.decayDays = num;
+						await this.plugin.saveSettings();
+					}
 				}));
 	}
 }
