@@ -16,6 +16,13 @@ interface NoteTitleSuggestion {
 	file: TFile;
 }
 
+interface UsageStats {
+	[filePath: string]: {
+		count: number;      // Number of times this note was selected
+		lastUsed: number;   // Timestamp of last selection
+	}
+}
+
 interface AutoLinkSettings {
 	minTriggerLength: number;
 	maxSuggestions: number;
@@ -23,6 +30,7 @@ interface AutoLinkSettings {
 	matchStart: boolean;
 	includeAliases: boolean;
 	showPath: boolean;
+	enableUsageRanking: boolean;  // Toggle usage-based ranking
 }
 
 const DEFAULT_SETTINGS: AutoLinkSettings = {
@@ -32,6 +40,7 @@ const DEFAULT_SETTINGS: AutoLinkSettings = {
 	matchStart: false,
 	includeAliases: true,
 	showPath: false,
+	enableUsageRanking: true,
 }
 
 class NoteTitleSuggester extends EditorSuggest<NoteTitleSuggestion> {
@@ -156,15 +165,10 @@ class NoteTitleSuggester extends EditorSuggest<NoteTitleSuggestion> {
 
 			if (matches) {
 				suggestions.push({ title, file });
-
-				// Stop if we've reached the maximum
-				if (suggestions.length >= settings.maxSuggestions) {
-					break;
-				}
 			}
 
 			// Also check aliases if enabled
-			if (settings.includeAliases && suggestions.length < settings.maxSuggestions) {
+			if (settings.includeAliases) {
 				const cache = this.app.metadataCache.getFileCache(file);
 				if (cache?.frontmatter?.aliases) {
 					const aliases = Array.isArray(cache.frontmatter.aliases)
@@ -185,10 +189,6 @@ class NoteTitleSuggester extends EditorSuggest<NoteTitleSuggestion> {
 							if (aliasMatches) {
 								// Add with alias as the title, so it displays in suggestions
 								suggestions.push({ title: alias, file });
-
-								if (suggestions.length >= settings.maxSuggestions) {
-									break;
-								}
 							}
 						}
 					}
@@ -196,7 +196,18 @@ class NoteTitleSuggester extends EditorSuggest<NoteTitleSuggestion> {
 			}
 		}
 
-		return suggestions;
+		// Sort by usage frequency if enabled
+		if (settings.enableUsageRanking) {
+			const usageStats = this.plugin.usageStats;
+			suggestions.sort((a, b) => {
+				const aCount = usageStats[a.file.path]?.count || 0;
+				const bCount = usageStats[b.file.path]?.count || 0;
+				return bCount - aCount; // Descending order (most used first)
+			});
+		}
+
+		// Limit to maximum suggestions
+		return suggestions.slice(0, settings.maxSuggestions);
 	}
 
 	/**
@@ -236,6 +247,11 @@ class NoteTitleSuggester extends EditorSuggest<NoteTitleSuggestion> {
 			ch: start.ch + link.length,
 		};
 		editor.setCursor(newCursorPos);
+
+		// Track usage if enabled
+		if (this.plugin.settings.enableUsageRanking) {
+			this.plugin.trackNoteSelection(suggestion.file.path);
+		}
 	}
 }
 
@@ -326,11 +342,23 @@ class AutoLinkSettingsTab extends PluginSettingTab {
 					this.plugin.settings.showPath = value;
 					await this.plugin.saveSettings();
 				}));
+
+		// Enable usage-based ranking
+		new Setting(containerEl)
+			.setName('Enable usage-based ranking')
+			.setDesc('Rank suggestions based on how frequently you select them. Notes you link to more often will appear first.')
+			.addToggle(toggle => toggle
+				.setValue(this.plugin.settings.enableUsageRanking)
+				.onChange(async (value) => {
+					this.plugin.settings.enableUsageRanking = value;
+					await this.plugin.saveSettings();
+				}));
 	}
 }
 
 export default class AutoLinkSuggestionsPlugin extends Plugin {
 	settings: AutoLinkSettings;
+	usageStats: UsageStats = {};
 	private suggester: NoteTitleSuggester;
 
 	async onload() {
@@ -345,6 +373,23 @@ export default class AutoLinkSuggestionsPlugin extends Plugin {
 
 		// Register settings tab
 		this.addSettingTab(new AutoLinkSettingsTab(this.app, this));
+
+		// Register vault event handlers for usage stats cleanup
+		this.registerEvent(
+			this.app.vault.on('delete', (file) => {
+				if (file instanceof TFile) {
+					this.cleanupUsageStats(file.path);
+				}
+			})
+		);
+
+		this.registerEvent(
+			this.app.vault.on('rename', (file, oldPath) => {
+				if (file instanceof TFile) {
+					this.updateUsageStatsPath(oldPath, file.path);
+				}
+			})
+		);
 	}
 
 	onunload() {
@@ -352,10 +397,54 @@ export default class AutoLinkSuggestionsPlugin extends Plugin {
 	}
 
 	async loadSettings() {
-		this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
+		const data = await this.loadData();
+		this.settings = Object.assign({}, DEFAULT_SETTINGS, data?.settings || data || {});
+		this.usageStats = data?.usageStats || {};
 	}
 
 	async saveSettings() {
-		await this.saveData(this.settings);
+		await this.saveData({
+			settings: this.settings,
+			usageStats: this.usageStats
+		});
+	}
+
+	/**
+	 * Track when a note is selected from suggestions
+	 */
+	trackNoteSelection(filePath: string): void {
+		if (!this.usageStats[filePath]) {
+			this.usageStats[filePath] = {
+				count: 0,
+				lastUsed: 0
+			};
+		}
+
+		this.usageStats[filePath].count++;
+		this.usageStats[filePath].lastUsed = Date.now();
+
+		// Save asynchronously (fire and forget to avoid blocking UI)
+		this.saveSettings();
+	}
+
+	/**
+	 * Clean up usage stats when a file is deleted
+	 */
+	private cleanupUsageStats(filePath: string): void {
+		if (this.usageStats[filePath]) {
+			delete this.usageStats[filePath];
+			this.saveSettings();
+		}
+	}
+
+	/**
+	 * Update usage stats when a file is renamed
+	 */
+	private updateUsageStatsPath(oldPath: string, newPath: string): void {
+		if (this.usageStats[oldPath]) {
+			this.usageStats[newPath] = this.usageStats[oldPath];
+			delete this.usageStats[oldPath];
+			this.saveSettings();
+		}
 	}
 }
