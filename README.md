@@ -24,38 +24,14 @@ The plugin intelligently:
 
 Access the plugin settings via Settings → Auto Link Suggestions to customize the behavior:
 
-### Minimum Characters
-- **Description**: Minimum number of characters you need to type before suggestions appear
-- **Default**: 2
-- **Use case**: Increase this if you want fewer/more targeted suggestions; decrease to get suggestions sooner
-
-### Maximum Suggestions
-- **Description**: Maximum number of suggestions to display in the dropdown menu
-- **Default**: 10
-- **Use case**: Increase for more options; decrease for a cleaner, faster interface
-
-### Case Sensitive
-- **Description**: Whether matching should be case-sensitive
-- **Default**: Off (case-insensitive)
-- **Use case**: Enable if you have notes with similar names but different capitalization
-
-### Match at Start
-- **Description**: Only match note titles that start with your typed text
-- **Default**: Off (matches anywhere in title)
-- **Example**:
-  - Off: typing "link" will match "Auto **Link** Suggestions"
-  - On: typing "link" will NOT match "Auto Link Suggestions" (doesn't start with "link")
-
-### Include Aliases
-- **Description**: Show note aliases from frontmatter in suggestions
-- **Default**: On
-- **Example**: If a note has `aliases: [AI, Artificial Intelligence]` in frontmatter, typing "AI" will suggest this note
-- **Use case**: Disable if you only want to see actual note titles
-
-### Show File Path
-- **Description**: Display the file path below each suggestion in the dropdown
-- **Default**: Off
-- **Use case**: Enable if you have notes with identical titles in different folders and need to distinguish them
+| Setting | Description | Default | Use Case / Notes |
+|---------|-------------|---------|------------------|
+| **Minimum Characters** | Minimum number of characters you need to type before suggestions appear | 2 | Increase for fewer/more targeted suggestions; decrease to get suggestions sooner |
+| **Maximum Suggestions** | Maximum number of suggestions to display in the dropdown menu | 10 | Increase for more options; decrease for a cleaner, faster interface |
+| **Case Sensitive** | Whether matching should be case-sensitive | Off | Enable if you have notes with similar names but different capitalization |
+| **Match at Start** | Only match note titles that start with your typed text (instead of anywhere in the title) | Off | When off, typing "link" matches "Auto **Link** Suggestions"<br>When on, typing "link" won't match "Auto Link Suggestions" |
+| **Include Aliases** | Show note aliases from frontmatter in suggestions | On | If a note has `aliases: [AI]` in frontmatter, typing "AI" will suggest it. Disable to only show actual note titles |
+| **Show File Path** | Display the file path below each suggestion in the dropdown | Off | Enable if you have notes with identical titles in different folders and need to distinguish them |
 
 ## Installation
 
@@ -125,4 +101,4 @@ If you encounter any issues or have suggestions for improvements, please open an
 
 ## License
 
-MIT License - see LICENSE file for details
+GNU General Public License v3.0 - see LICENSE file for details
