@@ -107,17 +107,17 @@ The plugin can also prioritize recently-used notes and decay old rankings:
 ### Newness Boost
 The plugin can boost recently-created notes to help surface fresh content:
 
-**Your scenario**: You have notes with "Sandra" in the title
-- "Sandra Smith" - Created 2 years ago, linked 50 times
-- "Sandra - Coaching Session 2024-11-07" - Created 7 days ago, linked 1 time
+**Your scenario**: You have notes with "Jane" in the title
+- "Jane Smith" - Created 2 years ago, linked 50 times
+- "Jane - Mentoring Session 2024-11-07" - Created 7 days ago, linked 1 time
 
-**Without newness boost** (typing "Sandra"):
-- Sandra Smith (scores very high due to frequency)
-- Sandra - Coaching Session 2024-11-07 (may not appear in top suggestions)
+**Without newness boost** (typing "Jane"):
+- Jane Smith (scores very high due to frequency)
+- Jane - Mentoring Session 2024-11-07 (may not appear in top suggestions)
 
-**With newness boost enabled** (typing "Sandra"):
-- Sandra Smith ⭐ (still high due to frequency)
-- Sandra - Coaching Session 2024-11-07 🆕 (boosted up to 1.5x, now visible!)
+**With newness boost enabled** (typing "Jane"):
+- Jane Smith ⭐ (still high due to frequency)
+- Jane - Mentoring Session 2024-11-07 🆕 (boosted up to 1.5x, now visible!)
 
 **How it works**:
 - Notes created today: Full boost (e.g., 1.5x with default 0.5 strength)
