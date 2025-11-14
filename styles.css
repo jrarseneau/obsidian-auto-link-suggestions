@@ -1,0 +1,15 @@
+/* Styling for auto link suggestion items */
+.auto-link-suggestion-item {
+	padding: 4px 8px;
+	cursor: pointer;
+	border-radius: 4px;
+}
+
+.auto-link-suggestion-item:hover {
+	background-color: var(--background-modifier-hover);
+}
+
+/* Selected suggestion item */
+.suggestion-item.is-selected .auto-link-suggestion-item {
+	background-color: var(--background-modifier-hover);
+}
