@@ -34,6 +34,9 @@ interface AutoLinkSettings {
 	enableRecencyBoost: boolean;  // Boost recently-used notes
 	recencyWeight: number;        // Weight for recency (0-100, percentage)
 	decayDays: number;            // Days before usage starts to decay
+	enableNewnessBoost: boolean;  // Boost recently-created notes
+	newnessBoostDays: number;     // Days for newness boost to apply
+	newnessBoostStrength: number; // Strength of newness boost (0.0-2.0, adds to 1.0)
 }
 
 const DEFAULT_SETTINGS: AutoLinkSettings = {
@@ -47,6 +50,9 @@ const DEFAULT_SETTINGS: AutoLinkSettings = {
 	enableRecencyBoost: true,
 	recencyWeight: 30,      // 30% weight to recency, 70% to frequency
 	decayDays: 90,          // Start decaying after 90 days
+	enableNewnessBoost: true,
+	newnessBoostDays: 30,   // Boost notes created in last 30 days
+	newnessBoostStrength: 0.5,  // 0.5 = up to 1.5x boost (1.0 + 0.5)
 }
 
 class NoteTitleSuggester extends EditorSuggest<NoteTitleSuggestion> {
@@ -228,8 +234,8 @@ class NoteTitleSuggester extends EditorSuggest<NoteTitleSuggestion> {
 				const aStats = usageStats[a.file.path];
 				const bStats = usageStats[b.file.path];
 
-				const aScore = this.calculateScore(aStats, now, maxCount, maxRecency, dayInMs, decayThreshold, settings);
-				const bScore = this.calculateScore(bStats, now, maxCount, maxRecency, dayInMs, decayThreshold, settings);
+				const aScore = this.calculateScore(aStats, a.file, now, maxCount, maxRecency, dayInMs, decayThreshold, settings);
+				const bScore = this.calculateScore(bStats, b.file, now, maxCount, maxRecency, dayInMs, decayThreshold, settings);
 
 				return bScore - aScore; // Descending order (highest score first)
 			});
@@ -244,6 +250,7 @@ class NoteTitleSuggester extends EditorSuggest<NoteTitleSuggestion> {
 	 */
 	private calculateScore(
 		stats: { count: number; lastUsed: number } | undefined,
+		file: TFile,
 		now: number,
 		maxCount: number,
 		maxRecency: number,
@@ -251,16 +258,13 @@ class NoteTitleSuggester extends EditorSuggest<NoteTitleSuggestion> {
 		decayThreshold: number,
 		settings: AutoLinkSettings
 	): number {
-		if (!stats || stats.count === 0) {
-			return 0;
-		}
-
 		// Normalize frequency score (0-1)
-		const frequencyScore = maxCount > 0 ? stats.count / maxCount : 0;
+		// Use 0 for notes that have never been selected
+		const frequencyScore = (stats && maxCount > 0) ? stats.count / maxCount : 0;
 
 		// Calculate recency score (0-1)
 		let recencyScore = 0;
-		if (settings.enableRecencyBoost && stats.lastUsed > 0) {
+		if (settings.enableRecencyBoost && stats?.lastUsed && stats.lastUsed > 0) {
 			const timeSinceUse = now - stats.lastUsed;
 			const recencyValue = 1 / (timeSinceUse + 1);
 			recencyScore = maxRecency > 0 ? recencyValue / maxRecency : 0;
@@ -268,7 +272,7 @@ class NoteTitleSuggester extends EditorSuggest<NoteTitleSuggestion> {
 
 		// Apply time-based decay
 		let decayFactor = 1.0;
-		if (stats.lastUsed > 0) {
+		if (stats?.lastUsed && stats.lastUsed > 0) {
 			const timeSinceUse = now - stats.lastUsed;
 			if (timeSinceUse > decayThreshold) {
 				// Linear decay: reduce by 50% over the next decay period
@@ -286,7 +290,23 @@ class NoteTitleSuggester extends EditorSuggest<NoteTitleSuggestion> {
 			? (frequencyScore * frequencyWeightFraction) + (recencyScore * recencyWeightFraction)
 			: frequencyScore;
 
-		return baseScore * decayFactor;
+		// Apply newness boost
+		let newnessBoost = 1.0;
+		if (settings.enableNewnessBoost && file.stat.ctime) {
+			const daysSinceCreation = (now - file.stat.ctime) / dayInMs;
+
+			if (daysSinceCreation <= settings.newnessBoostDays) {
+				// Linear fade: full boost at creation, fades to 0 at newnessBoostDays
+				const boostFactor = 1.0 - (daysSinceCreation / settings.newnessBoostDays);
+				newnessBoost = 1.0 + (boostFactor * settings.newnessBoostStrength);
+			}
+		}
+
+		// For notes with no usage history, give them a small base score so newness boost can take effect
+		// This allows new unused notes to rank higher than old unused notes
+		const effectiveBaseScore = baseScore > 0 ? baseScore : 0.01;
+
+		return effectiveBaseScore * decayFactor * newnessBoost;
 	}
 
 	/**
@@ -470,6 +490,47 @@ class AutoLinkSettingsTab extends PluginSettingTab {
 					const num = parseInt(value);
 					if (!isNaN(num) && num > 0) {
 						this.plugin.settings.decayDays = num;
+						await this.plugin.saveSettings();
+					}
+				}));
+
+		// Enable newness boost
+		new Setting(containerEl)
+			.setName('Enable newness boost')
+			.setDesc('Boost recently-created notes in rankings. New notes get a temporary ranking boost that fades over time.')
+			.addToggle(toggle => toggle
+				.setValue(this.plugin.settings.enableNewnessBoost)
+				.onChange(async (value) => {
+					this.plugin.settings.enableNewnessBoost = value;
+					await this.plugin.saveSettings();
+				}));
+
+		// Newness boost days
+		new Setting(containerEl)
+			.setName('Newness boost duration (days)')
+			.setDesc('How many days newly-created notes receive a ranking boost. Boost fades linearly to zero. Default: 30 days')
+			.addText(text => text
+				.setPlaceholder('30')
+				.setValue(String(this.plugin.settings.newnessBoostDays))
+				.onChange(async (value) => {
+					const num = parseInt(value);
+					if (!isNaN(num) && num > 0) {
+						this.plugin.settings.newnessBoostDays = num;
+						await this.plugin.saveSettings();
+					}
+				}));
+
+		// Newness boost strength
+		new Setting(containerEl)
+			.setName('Newness boost strength')
+			.setDesc('Maximum boost multiplier for brand-new notes (0.0-2.0). At 0.5, a new note gets up to 1.5x score. At 1.0, up to 2.0x score. Default: 0.5')
+			.addText(text => text
+				.setPlaceholder('0.5')
+				.setValue(String(this.plugin.settings.newnessBoostStrength))
+				.onChange(async (value) => {
+					const num = parseFloat(value);
+					if (!isNaN(num) && num >= 0 && num <= 2.0) {
+						this.plugin.settings.newnessBoostStrength = num;
 						await this.plugin.saveSettings();
 					}
 				}));
