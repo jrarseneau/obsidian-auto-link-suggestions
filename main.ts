@@ -258,16 +258,13 @@ class NoteTitleSuggester extends EditorSuggest<NoteTitleSuggestion> {
 		decayThreshold: number,
 		settings: AutoLinkSettings
 	): number {
-		if (!stats || stats.count === 0) {
-			return 0;
-		}
-
 		// Normalize frequency score (0-1)
-		const frequencyScore = maxCount > 0 ? stats.count / maxCount : 0;
+		// Use 0 for notes that have never been selected
+		const frequencyScore = (stats && maxCount > 0) ? stats.count / maxCount : 0;
 
 		// Calculate recency score (0-1)
 		let recencyScore = 0;
-		if (settings.enableRecencyBoost && stats.lastUsed > 0) {
+		if (settings.enableRecencyBoost && stats?.lastUsed && stats.lastUsed > 0) {
 			const timeSinceUse = now - stats.lastUsed;
 			const recencyValue = 1 / (timeSinceUse + 1);
 			recencyScore = maxRecency > 0 ? recencyValue / maxRecency : 0;
@@ -275,7 +272,7 @@ class NoteTitleSuggester extends EditorSuggest<NoteTitleSuggestion> {
 
 		// Apply time-based decay
 		let decayFactor = 1.0;
-		if (stats.lastUsed > 0) {
+		if (stats?.lastUsed && stats.lastUsed > 0) {
 			const timeSinceUse = now - stats.lastUsed;
 			if (timeSinceUse > decayThreshold) {
 				// Linear decay: reduce by 50% over the next decay period
@@ -305,7 +302,11 @@ class NoteTitleSuggester extends EditorSuggest<NoteTitleSuggestion> {
 			}
 		}
 
-		return baseScore * decayFactor * newnessBoost;
+		// For notes with no usage history, give them a small base score so newness boost can take effect
+		// This allows new unused notes to rank higher than old unused notes
+		const effectiveBaseScore = baseScore > 0 ? baseScore : 0.01;
+
+		return effectiveBaseScore * decayFactor * newnessBoost;
 	}
 
 	/**
