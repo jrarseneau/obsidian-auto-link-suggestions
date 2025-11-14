@@ -6,6 +6,8 @@ An Obsidian plugin that automatically suggests note titles as you type and creat
 
 - **Smart Auto-Complete**: As you type, the plugin automatically suggests matching note titles from your vault
 - **Usage-Based Ranking**: Notes you link to frequently appear first in suggestions (learns from your behavior)
+- **Recency Weighting**: Boost recently-used notes to prioritize current work over old favorites
+- **Time-Based Decay**: Gradually reduce rankings for notes not used recently to keep suggestions fresh
 - **Alias Support**: Includes note aliases from frontmatter in suggestions
 - **Flexible Matching**: Choose between matching anywhere in the title or only at the start
 - **Customizable Behavior**: Configure minimum trigger length, maximum suggestions, and more
@@ -35,6 +37,9 @@ Access the plugin settings via Settings → Auto Link Suggestions to customize t
 | **Include Aliases** | Show note aliases from frontmatter in suggestions | On | If a note has `aliases: [AI]` in frontmatter, typing "AI" will suggest it. Disable to only show actual note titles |
 | **Show File Path** | Display the file path below each suggestion in the dropdown | Off | Enable if you have notes with identical titles in different folders and need to distinguish them |
 | **Enable Usage-Based Ranking** | Rank suggestions based on how frequently you select them | On | When enabled, notes you link to more often appear first in the dropdown. Perfect for surfacing your most-used references quickly |
+| **Enable Recency Boost** | Boost recently-used notes in rankings | On | Prioritizes notes you've linked to recently. A note used yesterday will rank higher than one used months ago, even with the same total usage count |
+| **Recency Weight** | Balance between recency and frequency (0-100%) | 30% | Higher values favor recently-used notes more. At 30%, scoring is 70% frequency + 30% recency. At 50%, they're equally weighted |
+| **Decay Period (days)** | Days before rankings start to decay | 90 | Notes not used within this period gradually lose ranking (50% reduction over the next period). Prevents old favorites from dominating forever |
 
 ## Installation
 
@@ -73,6 +78,27 @@ The plugin learns from your selections to improve suggestions over time:
 - Johnny Appleseed
 
 The ranking is based on how many times you've selected each note. This makes your most-referenced notes instantly accessible!
+
+### Recency Weighting & Decay
+The plugin can also prioritize recently-used notes and decay old rankings:
+
+**Scenario**: You have two notes, both linked 10 times
+- "Project Alpha" - Last used 2 days ago
+- "Project Beta" - Last used 6 months ago
+
+**With recency boost enabled** (typing "Project"):
+- Project Alpha ⭐ (appears first - recently used)
+- Project Beta (used long ago)
+
+**After 90 days** (default decay period):
+- Notes unused for 90+ days gradually lose ranking (50% reduction over the next 90 days)
+- This prevents old projects from cluttering suggestions when you're working on new things
+- Frequency still matters - a note used 100 times will rank higher than one used 5 times, even if older
+
+**Configurable weighting**:
+- At 30% recency weight (default): 70% frequency + 30% recency
+- At 50% recency weight: Equal balance
+- At 0% recency weight: Pure frequency-based ranking (like before)
 
 ### With Aliases
 If you have a note "Artificial Intelligence.md" with frontmatter:
