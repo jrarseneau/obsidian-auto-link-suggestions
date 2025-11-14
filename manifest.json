@@ -1,0 +1,10 @@
+{
+	"id": "auto-link-suggestions",
+	"name": "Auto Link Suggestions",
+	"version": "1.0.0",
+	"minAppVersion": "0.15.0",
+	"description": "Automatically suggests note titles as you type and creates links to them",
+	"author": "Your Name",
+	"authorUrl": "",
+	"isDesktopOnly": false
+}
