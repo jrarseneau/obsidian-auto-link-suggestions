@@ -13,3 +13,15 @@
 .suggestion-item.is-selected .auto-link-suggestion-item {
 	background-color: var(--background-modifier-hover);
 }
+
+/* Suggestion title */
+.auto-link-suggestion-title {
+	font-weight: 500;
+}
+
+/* Suggestion file path */
+.auto-link-suggestion-path {
+	font-size: 0.85em;
+	opacity: 0.7;
+	margin-top: 2px;
+}
