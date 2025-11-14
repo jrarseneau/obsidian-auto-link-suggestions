@@ -5,6 +5,7 @@ An Obsidian plugin that automatically suggests note titles as you type and creat
 ## Features
 
 - **Smart Auto-Complete**: As you type, the plugin automatically suggests matching note titles from your vault
+- **Usage-Based Ranking**: Notes you link to frequently appear first in suggestions (learns from your behavior)
 - **Alias Support**: Includes note aliases from frontmatter in suggestions
 - **Flexible Matching**: Choose between matching anywhere in the title or only at the start
 - **Customizable Behavior**: Configure minimum trigger length, maximum suggestions, and more
@@ -19,6 +20,7 @@ The plugin intelligently:
 - Won't trigger if you're already inside a link (between `[[` and `]]`)
 - Updates suggestions in real-time as your vault changes
 - Matches against both note titles and aliases (if enabled)
+- Learns from your selections to rank frequently-used notes higher (when enabled)
 
 ## Settings
 
@@ -32,6 +34,7 @@ Access the plugin settings via Settings → Auto Link Suggestions to customize t
 | **Match at Start** | Only match note titles that start with your typed text (instead of anywhere in the title) | Off | When off, typing "link" matches "Auto **Link** Suggestions"<br>When on, typing "link" won't match "Auto Link Suggestions" |
 | **Include Aliases** | Show note aliases from frontmatter in suggestions | On | If a note has `aliases: [AI]` in frontmatter, typing "AI" will suggest it. Disable to only show actual note titles |
 | **Show File Path** | Display the file path below each suggestion in the dropdown | Off | Enable if you have notes with identical titles in different folders and need to distinguish them |
+| **Enable Usage-Based Ranking** | Rank suggestions based on how frequently you select them | On | When enabled, notes you link to more often appear first in the dropdown. Perfect for surfacing your most-used references quickly |
 
 ## Installation
 
@@ -55,6 +58,21 @@ Start typing: "obsid"
 Suggestions appear: "Obsidian Tips", "Obsidian Plugins", "Obsidian Workflow"
 Select one → automatically inserts: [[Obsidian Tips]]
 ```
+
+### Usage-Based Ranking
+The plugin learns from your selections to improve suggestions over time:
+
+**Initial state** (typing "John"):
+- John Doe
+- John Smith
+- Johnny Appleseed
+
+**After frequently linking to "John Smith"** (typing "John"):
+- John Smith ⭐ (appears first due to high usage)
+- John Doe
+- Johnny Appleseed
+
+The ranking is based on how many times you've selected each note. This makes your most-referenced notes instantly accessible!
 
 ### With Aliases
 If you have a note "Artificial Intelligence.md" with frontmatter:
