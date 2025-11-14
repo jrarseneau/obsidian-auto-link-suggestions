@@ -1,0 +1,1 @@
+# obsidian-auto-link-suggestions
